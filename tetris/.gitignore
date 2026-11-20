@@ -1,0 +1,75 @@
+﻿
+# Visual Studio 임시 파일
+.vs/
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+ipch/
+
+# 컴파일 및 링크 결과물
+*.obj
+*.o
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.idb
+*.tlog
+*.lastbuildstate
+*.log
+
+# 빌드 결과 디렉터리
+x64/
+x86/
+Debug/
+Release/
+build/
+
+# VS Code 개인 설정
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# 임시 파일
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+
+# Build directories
+x64/
+x86/
+Debug/
+Release/
+build/
+
+# Compiler outputs
+*.obj
+*.o
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.idb
+*.tlog
+*.lastbuildstate
+*.recipe
+
+# Temporary files
+*.log
+*.tmp
+*.bak
+*.dt.d.json
+*.dt.module.json
+*.dt.module.json.command
