@@ -32,45 +32,14 @@ const Block::Rotations& Block::tetromino(int shapeIndex)
     if (shapeIndex < 0 || shapeIndex >= 7) shapeIndex = 0;
     return table[shapeIndex];
 }
-
-Block::Block(const Rotations& rotations, CellType type)
-    : rotations_(rotations), cellType_(type) {}
+Block::Block(const Rotations& rotations, char value)
+    : rotations_(rotations), cellValue_(value) {}
 
 void Block::resetPosition()
 {
     x_ = START_X;
     y_ = START_Y;
     angle_ = 0;
-}
-
-bool Block::collides(const BoardAccess& board) const
-{
-    for (int r = 0; r < SIZE; ++r) {
-        for (int c = 0; c < SIZE; ++c) {
-            if (!isFilled(r, c)) continue;
-            const int bx = x_ + c;
-            const int by = y_ + r;
-
-            // 좌우 벽 밖이거나 바닥 아래면 충돌
-            if (bx < 0 || bx >= board.width() || by >= board.height()) return true;
-
-            if (by < 0) {
-                if (board.getCell(bx, 0) == CellType::Wall) return true;
-                continue;
-            }
-
-            if (isSolid(board.getCell(bx, by))) return true;
-        }
-    }
-    return false;
-}
-
-void Block::stampOnto(BoardAccess& board) const
-{
-    for (int r = 0; r < SIZE; ++r)
-        for (int c = 0; c < SIZE; ++c)
-            if (isFilled(r, c) && board.isInside(x_ + c, y_ + r))
-                board.setCell(x_ + c, y_ + r, cellType_);
 }
 
 bool Block::isAboveTop() const
