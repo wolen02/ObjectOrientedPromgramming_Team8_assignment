@@ -26,8 +26,6 @@ void Board::showBoard() const {
     cout << '\n';
 }
 
-
-
 int Board::checkFullLine() {
     int lines = 0;
     for (int y = height - 2; y >= 0; y--) {
@@ -76,14 +74,13 @@ bool Board::canPlace(const Block& b) const {
     return true;
 }
 
-//변경 - 블록을 보드에 저장
-void Board::place(const Block& b) {
-    if (!canPlace(b))
-        return;
+// [변경] 블록을 보드에 저장
+int Board::place(const Block& b) { // 변경
+
+    if (!canPlace(b)) return -1; // 변경
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-
             int x = b.x() + j;
             int y = b.y() + i;
 
@@ -92,6 +89,8 @@ void Board::place(const Block& b) {
             }
         }
     }
+
+    return 0; // 추가
 }
 
 //bool Board::canPlaceBlock(const char shape[4][4], int x, int y) const {

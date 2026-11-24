@@ -18,7 +18,8 @@ public:
 
     // [추가] - 블록 객체를 직접 사용.
     bool canPlace(const Block& b) const; // 현재 위치에 블록을 놓을 수 있으면 true, 충돌하면 false를 반환한다.
-    void place(const Block& b); // 바닥에 도착한 블록을 보드에 저장한다.
+    // [변경] - int-로
+    int place(const Block& b); // 바닥에 도착한 블록을 보드에 저장한다.
 };
 
 
