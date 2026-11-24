@@ -16,10 +16,12 @@ public:
     int getCell(int x, int y) const;  // 해당 위치의 값을 가져온다.
     void setCell(int x, int y, int value);  // 해당 위치의 값을 바꿔요
 
-    // [추가] - 블록 객체를 직접 사용.
+    // 블록 객체를 직접 사용.
     bool canPlace(const Block& b) const; // 현재 위치에 블록을 놓을 수 있으면 true, 충돌하면 false를 반환한다.
     // [변경] - int-로
     int place(const Block& b); // 바닥에 도착한 블록을 보드에 저장한다.
+    //[추가] 기존 블록을 보드에서 삭제한다.
+    int removeBlock(const Block& b);
 };
 
 

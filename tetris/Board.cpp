@@ -92,6 +92,43 @@ int Board::place(const Block& b) { // 변경
 
     return 0; // 추가
 }
+// [추가] 기존 블록을 보드에서 삭제
+int Board::removeBlock(const Block& b) {
+
+    // 블록을 삭제할 수 있는지 확인
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+
+            if (!b.isFilled(i, j))
+                continue;
+
+            int x = b.x() + j;
+            int y = b.y() + i;
+
+            if (x < 1 || x >= width - 1 || y >= height - 1)
+                return -1;
+
+            if (y >= 0 && total_block[y][x] != b.cellValue())
+                return -1;
+        }
+    }
+
+    // 기존 블록 삭제
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+
+            int x = b.x() + j;
+            int y = b.y() + i;
+
+            if (b.isFilled(i, j) && y >= 0) {
+                total_block[y][x] = 0;
+            }
+        }
+    }
+
+    return 0;
+}
+
 
 //bool Board::canPlaceBlock(const char shape[4][4], int x, int y) const {
 //    for (int i = 0; i < 4; i++)
