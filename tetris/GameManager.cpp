@@ -4,6 +4,7 @@
 // 콘솔에서 키보드가 눌린 상태인지 확인하는 _kbhit()함수 포함하는 헤더
 #include<conio.h>
 #include"Stage.h"
+#include"CropBlock.h"
 
 #define EXT_KEY			0xffffffe0	//확장키 인식값 
 #define KEY_LEFT		0x4b
@@ -13,32 +14,12 @@
 using namespace std;
 
 GameManager::GameManager()
-	:level(0), lines(0), ab_x(5), ab_y(1),is_gameover(0), block_angle(0), score(0)
+	:level(0), lines(0), ab_x(5), ab_y(1),is_gameover(0), score(0)
 {
 	// 난수 설정
 	srand((unsigned)time(NULL));
 
-	// 여기부터
-	int i, j;
-
-	for (i = 0;i < 20;i++)
-	{
-		for (j = 0;j < 14;j++)
-		{
-			if ((j == 0) || (j == 13))
-			{
-				total_block[i][j] = 1;
-			}
-			else {
-				total_block[i][j] = 0;
-			}
-		}
-	}
-
-	for (j = 0;j < 14;j++)			//화면의 제일 밑의 줄은 1로 채운다.
-		total_block[20][j] = 1;
-
-	// 여기까지는 board에서 초기화 해야할 부분 나중에 지우자.
+	board = Board();
 
 	// Stage 정보 저장.
 	for (int i = 0; i < size(stage_data); i++) {
@@ -56,24 +37,25 @@ int GameManager::init()
 	// 시작하면 start 화면이 보여야함.
 	show_logo();
 
+	// 시작하면 조작키를 보여주고  stage를 입력 받음
+	input_data();
+
 	// 무한 반복 실행
 	while (1)
 	{
-		// input_data() 기능은 잘 모르겠음
-		input_data();
+		
 		// 비어있는 보드 보여주기
-		show_total_block();
+		board.showBoard();
 
 		// 현재 블록과 다음에 올 블록 미리 생성하기
-		block_shape = make_new_block();
-		next_block_shape = make_new_block();
-		// 오른쪽 위에 다음에 올 블록 표시
-		show_next_block(next_block_shape);
-		
-		// 블록 내려오기
-		block_start(block_shape, &block_angle, &block_x, &block_y);
+		curBlock = make_unique<CropBlock>(rand()%7);
+		nextBlock = make_unique<CropBlock>(rand()%7);
 
-		// 현재 게임 상태를 불러오는 것 같은데, 왜 이렇게 구현했는 지 이해가 안 됨.
+		// 오른쪽 위에 다음에 올 블록 표시
+		//show_next_block(next_block_shape);
+		
+		
+		// 현재 스테이지 정보, 점수, 클리어까지 남은 라인의 수를 콘솔화면에 줄력
 		show_gamestat();
 
 
@@ -96,39 +78,57 @@ int GameManager::init()
 					switch (keytemp)
 					{
 					case KEY_UP:		//회전하기
-
-						if (strike_check(block_shape, (block_angle + 1) % 4, block_x, block_y) == 0)
+						
+						curBlock->rotateCW();
+						if (board.canPlace(*curBlock))
 						{
-							erase_cur_block(block_shape, block_angle, block_x, block_y);
-							block_angle = (block_angle + 1) % 4;
-							show_cur_block(block_shape, block_angle, block_x, block_y);
+							// 이전 상태 지우고 다시 회전
+							curBlock->rotateCCW();
+							board.removeBlock(*curBlock);
+							curBlock->rotateCW();
+							board.place(*curBlock);
+							board.showBoard();
+
 						}
 						break;
 					case KEY_LEFT:		//왼쪽으로 이동
-						if (block_x > 1)
+						curBlock->moveLeft();
+						if (board.canPlace(*curBlock))
 						{
-							erase_cur_block(block_shape, block_angle, block_x, block_y);
-							block_x--;
-							if (strike_check(block_shape, block_angle, block_x, block_y) == 1)
-								block_x++;
+							// 이전 상태 지우고 다시 왼쪽으로 이동
+							curBlock->moveRight();
+							board.removeBlock(*curBlock);
+							curBlock->moveLeft();
+							board.place(*curBlock);
+							board.showBoard();
 
-							show_cur_block(block_shape, block_angle, block_x, block_y);
 						}
 						break;
 					case KEY_RIGHT:		//오른쪽으로 이동
-
-						if (block_x < 14)
+						curBlock->moveRight();
+						if (board.canPlace(*curBlock))
 						{
-							erase_cur_block(block_shape, block_angle, block_x, block_y);
-							block_x++;
-							if (strike_check(block_shape, block_angle, block_x, block_y) == 1)
-								block_x--;
-							show_cur_block(block_shape, block_angle, block_x, block_y);
+							// 이전 상태 지우고 다시 왼쪽으로 이동
+							curBlock->moveLeft();
+							board.removeBlock(*curBlock);
+							curBlock->moveRight();
+							board.place(*curBlock);
+							board.showBoard();
+
 						}
 						break;
 					case KEY_DOWN:		//아래로 이동
-						is_gameover = move_block(&block_shape, &block_angle, &block_x, &block_y, &next_block_shape);
-						show_cur_block(block_shape, block_angle, block_x, block_y);
+						curBlock->moveDown();
+						if (board.canPlace(*curBlock))
+						{
+							// 이전 상태 지우고 다시 왼쪽으로 이동
+							curBlock->moveUp();
+							board.removeBlock(*curBlock);
+							curBlock->moveDown();
+							board.place(*curBlock);
+							board.showBoard();
+
+						}
 						break;
 					}
 				}
