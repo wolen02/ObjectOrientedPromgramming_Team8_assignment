@@ -45,12 +45,16 @@ public:
 
     virtual std::string landMessage() const { return ""; }
 
+    virtual bool LineCompleted() { return true; } //[추가] 돌
+
 protected:
     Block(const Rotations& rotations, char value);
 
     static const Rotations& tetromino(int shapeIndex);
 
     static Rotations sameForAllAngles(const Grid& g) { return { g, g, g, g }; }
+
+    void setPosition(int x, int y) { x_ = x; y_ = y; }//[추가] 돌
 
 private:
     Rotations rotations_;
