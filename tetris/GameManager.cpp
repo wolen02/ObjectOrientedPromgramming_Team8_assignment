@@ -3,7 +3,6 @@
 #include <windows.h>
 // 콘솔에서 키보드가 눌린 상태인지 확인하는 _kbhit()함수 포함하는 헤더
 #include<conio.h>
-#include"Stage.h"
 #include"CropBlock.h"
 
 #define EXT_KEY			0xffffffe0	//확장키 인식값 
@@ -89,6 +88,8 @@ int GameManager::init()
 							board.place(*curBlock);
 							system("cls");
 							board.showBoard();
+							show_gamestat();
+							show_next_block(*nextBlock);
 
 						}
 						break;
@@ -103,6 +104,8 @@ int GameManager::init()
 							board.place(*curBlock);
 							system("cls");
 							board.showBoard();
+							show_gamestat();
+							show_next_block(*nextBlock);
 
 						}
 						break;
@@ -117,6 +120,8 @@ int GameManager::init()
 							board.place(*curBlock);
 							system("cls");
 							board.showBoard();
+							show_gamestat();
+							show_next_block(*nextBlock);
 
 						}
 						break;
@@ -131,7 +136,8 @@ int GameManager::init()
 							board.place(*curBlock);
 							system("cls");
 							board.showBoard();
-
+							show_gamestat();
+							show_next_block(*nextBlock);
 						}
 						break;
 					}
@@ -159,11 +165,13 @@ int GameManager::init()
 
 					system("cls");
 					board.showBoard();
+					show_gamestat();
+					show_next_block(*nextBlock);
 				}
 			}
 
 			// 방향키를 누르지 않았을 때, 블록이 밑으로 내려옴
-			if (i % stage_data[level].getSpeed() == 0)
+			if (i % stage_data[level].speed == 0)
 			{
 				curBlock->moveDown();
 				if (board.canPlace(*curBlock))
@@ -171,10 +179,12 @@ int GameManager::init()
 					// 이전 상태 지우고 다시 아래로 이동
 					curBlock->moveUp();
 					board.removeBlock(*curBlock);
+					board.showBoard();
 					curBlock->moveDown();
 					board.place(*curBlock);
 					system("cls");
 					board.showBoard();
+					show_gamestat();
 				}
 
 			}
@@ -182,15 +192,16 @@ int GameManager::init()
 			// 클리어한 line 확인
 			lines += board.checkFullLine();
 
-			if (stage_data[level].getClear_line() == lines)	//클리어 스테이지
+			if (stage_data[level].clear_line == lines)	//클리어 스테이지
 			{
 				level++;
 				lines = 0;
 			}
 
 			// 블록이 맞닿았음을 확인하고 닿았으면 블록이 윗칸을 넘는지 확인하여 게임 종료여부 확인
+			// 우선 디버깅을 위해 true로 설정하여 무조건 밑으로 내려오게 코드작성
 			curBlock->moveDown();
-			if (board.canPlace(*curBlock)) {
+			if (true) {
 				curBlock->moveUp();
 			}
 			else {
@@ -355,15 +366,6 @@ int GameManager::show_next_block(Block& b)
 	return 0;
 }
 
-
-int GameManager::block_start(int shape, int* angle, int* x, int* y)
-{
-	*x = 5;
-	*y = -3;
-	*angle = 0;
-	return 0;
-}
-
 int GameManager::show_gameover()
 {
 	SetColor(RED);
@@ -407,7 +409,7 @@ int GameManager::show_gamestat()
 	gotoxy(47, 10);
 	printf("%10d", score);
 	gotoxy(47, 13);
-	printf("%10d", stage_data[level].getClear_line() - lines);
+	printf("%10d", stage_data[level].clear_line - lines);
 	return 0;
 }
 

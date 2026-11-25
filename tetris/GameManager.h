@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include"Board.h"
-#include"Stage.h"
 #include"CropBlock.h"
 #include<memory>
 
@@ -8,6 +7,11 @@ class GameManager
 {
 private:
 	// 우리는 4단계로 나눌거니까, 각 단계의 stage 정보를 저장할 공간 마련
+	struct Stage{
+		int speed;
+		int stick_rate;
+		int clear_line;
+	};
 	Stage stage_data[4];
 	int score;
 	int level;
@@ -49,12 +53,9 @@ public:
 	void SetColor(int color);
 
 	int show_next_block(Block& b);
-	int merge_block(int shape, int angle, int x, int y);	//블럭이 바닥에 닿았을때 진행중인 블럭과 쌓아진 블럭을 합침
-	int block_start(int shape, int* angle, int* x, int* y);	//블럭이 처음 나올때 위치와 모양을 알려줌
 	int show_gameover();
 	int show_gamestat();
 	int input_data();
-	int check_full_line();
 	int show_cur_block(Block& b, int x, int y);
 };
 

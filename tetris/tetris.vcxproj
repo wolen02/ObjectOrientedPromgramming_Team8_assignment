@@ -144,14 +144,12 @@
     <ClCompile Include="CropBlock.cpp" />
     <ClCompile Include="GameManager.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Stage.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Block.h" />
     <ClInclude Include="Board.h" />
     <ClInclude Include="CropBlock.h" />
     <ClInclude Include="GameManager.h" />
-    <ClInclude Include="Stage.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
