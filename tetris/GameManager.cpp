@@ -1,9 +1,17 @@
-﻿#include "GameManager.h"
-#include<iostream>
+﻿#define WIN32_LEAN_AND_MAEN
+#define NOMINMAX
 #include <windows.h>
+
+#include "GameManager.h"
+#include<iostream>
+#include <ctime>     // [수정] time()
+#include <cstdlib>   // [수정] srand, rand, system
+#include <cstdio>    // [수정] printf
+#include <iterator>  // [수정] size(stage_data)
 // 콘솔에서 키보드가 눌린 상태인지 확인하는 _kbhit()함수 포함하는 헤더
 #include<conio.h>
 #include"Stage.h"
+#include"CropBlock.h"
 
 #define EXT_KEY			0xffffffe0	//확장키 인식값 
 #define KEY_LEFT		0x4b
@@ -13,42 +21,101 @@
 using namespace std;
 
 GameManager::GameManager()
-	:level(0), lines(0), ab_x(5), ab_y(1),is_gameover(0), block_angle(0), score(0)
+	: score(0), level(0), is_gameover(0), lines(0), ab_x(5), ab_y(1)   // [수정] 헤더 선언 순서대로
 {
 	// 난수 설정
 	srand((unsigned)time(NULL));
 
-	// 여기부터
-	int i, j;
+	// [수정] board = Board(); 삭제. 멤버라서 이미 생성자에서 초기화됨
 
-	for (i = 0;i < 20;i++)
-	{
-		for (j = 0;j < 14;j++)
-		{
-			if ((j == 0) || (j == 13))
-			{
-				total_block[i][j] = 1;
-			}
-			else {
-				total_block[i][j] = 0;
-			}
-		}
+	// Stage 정보 저장.  [수정] 4번째 인자 = 돌 개수 (2 + 단계)
+	for (int i = 0; i < (int)size(stage_data); i++) {
+		stage_data[i] = Stage((40 - 10 * i), (20 - 3 * i), 20);
 	}
-
-	for (j = 0;j < 14;j++)			//화면의 제일 밑의 줄은 1로 채운다.
-		total_block[20][j] = 1;
-
-	// 여기까지는 board에서 초기화 해야할 부분 나중에 지우자.
-
-	// Stage 정보 저장.
-	for (int i = 0; i < size(stage_data); i++) {
-		stage_data[i] = Stage((40-10*i), (20 - 3 * i), 20);
-	}
-
 }
 
 GameManager::~GameManager()
 {
+}
+
+// [수정] 블록 좌표만 옮긴다
+void GameManager::shiftBlock(int dx, int dy)
+{
+	if (dx < 0) curBlock->moveLeft();
+	if (dx > 0) curBlock->moveRight();
+	if (dy > 0) curBlock->moveDown();
+	if (dy < 0) curBlock->moveUp();
+}
+
+// [수정] 핵심 수정: 보드에 놓인 블록을 먼저 지워야 자기 자신과 충돌하지 않는다
+bool GameManager::moveBlock(int dx, int dy)
+{
+	board.removeBlock(*curBlock);      // 1. 지우고
+	shiftBlock(dx, dy);                // 2. 옮기고
+	bool ok = board.canPlace(*curBlock);   // 3. 검사
+	if (!ok) shiftBlock(-dx, -dy);     //    안 되면 되돌리고
+	board.place(*curBlock);            // 4. 다시 놓기
+	return ok;
+}
+
+bool GameManager::rotateBlock()
+{
+	board.removeBlock(*curBlock);
+	curBlock->rotateCW();
+	bool ok = board.canPlace(*curBlock);
+	if (!ok) curBlock->rotateCCW();
+	board.place(*curBlock);
+	return ok;
+}
+
+// [수정] 블록이 더 못 내려갈 때만 부른다. 게임오버면 true
+bool GameManager::landBlock()
+{
+	// 화면 위에 걸친 채로 멈췄으면 게임오버
+	if (curBlock->isAboveTop())
+		return true;
+
+	// 클리어한 line 확인 (착지한 뒤에만 검사해야 떨어지는 블록이 지워지지 않음)
+	int cleared = board.checkFullLine();
+	lines += cleared;
+	score += cleared * 100;   // [수정] 점수 (원하는 규칙으로 바꾸기)
+
+	if (stage_data[level].getClear_line() <= lines)	//클리어 스테이지
+	{
+		if (level < (int)size(stage_data) - 1) {   // [수정] stage_data[4] 넘어가지 않게
+			level++;
+			board.spawnStones(2 + level);   // [수정] 새 단계 돌. 돌 개수는 임시로 2 + 단계
+		}
+		lines = 0;
+	}
+
+	// 다음 블록 꺼내기
+	curBlock = move(nextBlock);
+	nextBlock = make_unique<CropBlock>(rand() % 7);
+
+	// 새 블록을 놓을 자리가 없으면 게임오버
+	if (!board.canPlace(*curBlock))
+		return true;
+	board.place(*curBlock);
+	return false;
+}
+
+// [수정] cls 대신 커서를 맨 위로 옮겨서 덮어쓰기 (깜빡임 감소) + 오른쪽 패널도 다시 그림
+void GameManager::redraw()
+{
+	gotoxy(0, 0);
+	board.showBoard();
+	show_next_block(*nextBlock);
+	show_gamestat();
+}
+
+// [수정] 게임오버 후 다시 시작할 때 초기화
+void GameManager::resetGame()
+{
+	board.initBoard();
+	score = 0;
+	lines = 0;
+	is_gameover = 0;
 }
 
 int GameManager::init()
@@ -56,122 +123,92 @@ int GameManager::init()
 	// 시작하면 start 화면이 보여야함.
 	show_logo();
 
+	// 시작하면 조작키를 보여주고  stage를 입력 받음
+	input_data();
+
 	// 무한 반복 실행
 	while (1)
 	{
-		// input_data() 기능은 잘 모르겠음
-		input_data();
-		// 비어있는 보드 보여주기
-		show_total_block();
+		// [수정] 매 판 시작마다 초기화 + 돌 배치
+		resetGame();
+		board.spawnStones(2 + level);   // [수정] 돌 개수는 임시로 2 + 단계 (Stage 에 돌 개수가 생기면 바꾸기)
 
 		// 현재 블록과 다음에 올 블록 미리 생성하기
-		block_shape = make_new_block();
-		next_block_shape = make_new_block();
-		// 오른쪽 위에 다음에 올 블록 표시
-		show_next_block(next_block_shape);
-		
-		// 블록 내려오기
-		block_start(block_shape, &block_angle, &block_x, &block_y);
+		curBlock = make_unique<CropBlock>(rand() % 7);
+		nextBlock = make_unique<CropBlock>(rand() % 7);
+		board.place(*curBlock);   // [수정] 처음 블록도 보드에 올려야 지우기/옮기기가 맞음
 
-		// 현재 게임 상태를 불러오는 것 같은데, 왜 이렇게 구현했는 지 이해가 안 됨.
-		show_gamestat();
-
+		system("cls");
+		redraw();
 
 		// 게임 시작
-		int i;
-		for (i = 1;1;i++)
+		for (int i = 1; ; i++)
 		{
+			bool changed = false;   // [수정] 화면을 다시 그릴지
+			bool landed = false;    // [수정] 이번에 착지했는지
+
 			// 키보드 입력이 감지되면
 			if (_kbhit())
 			{
 				// 입력된 키 확인하고
-				char keytemp = _getche();
+				char keytemp = _getch();   // [수정] _getche 는 글자를 화면에 찍어서 _getch 로
 
 				// 확장키로 읽되
-				if (keytemp == EXT_KEY)
+				if (keytemp == (char)EXT_KEY)
 				{
-					keytemp = _getche();
-					
+					keytemp = _getch();
+
 					// 방향키면 주어진 대로 움직이고
 					switch (keytemp)
 					{
 					case KEY_UP:		//회전하기
-
-						if (strike_check(block_shape, (block_angle + 1) % 4, block_x, block_y) == 0)
-						{
-							erase_cur_block(block_shape, block_angle, block_x, block_y);
-							block_angle = (block_angle + 1) % 4;
-							show_cur_block(block_shape, block_angle, block_x, block_y);
-						}
+						changed = rotateBlock();
 						break;
 					case KEY_LEFT:		//왼쪽으로 이동
-						if (block_x > 1)
-						{
-							erase_cur_block(block_shape, block_angle, block_x, block_y);
-							block_x--;
-							if (strike_check(block_shape, block_angle, block_x, block_y) == 1)
-								block_x++;
-
-							show_cur_block(block_shape, block_angle, block_x, block_y);
-						}
+						changed = moveBlock(-1, 0);
 						break;
 					case KEY_RIGHT:		//오른쪽으로 이동
-
-						if (block_x < 14)
-						{
-							erase_cur_block(block_shape, block_angle, block_x, block_y);
-							block_x++;
-							if (strike_check(block_shape, block_angle, block_x, block_y) == 1)
-								block_x--;
-							show_cur_block(block_shape, block_angle, block_x, block_y);
-						}
+						changed = moveBlock(1, 0);
 						break;
 					case KEY_DOWN:		//아래로 이동
-						is_gameover = move_block(&block_shape, &block_angle, &block_x, &block_y, &next_block_shape);
-						show_cur_block(block_shape, block_angle, block_x, block_y);
+						changed = moveBlock(0, 1);
+						if (!changed) landed = true;   // [수정] 못 내려가면 착지
 						break;
 					}
 				}
-				
-				// 입력 키가 스페이스 바면
+
+				// 입력 키가 스페이스 바면 바닥까지
 				if (keytemp == 32)
 				{
-					while (is_gameover == 0)
-					{
-						// move_block은 충돌이 일어났을 때 game over면 return 1
-						// 충돌이 일어났지만 문제없다면 return 2
-						// 충돌이 일어나지 않았다면 return 0
-						is_gameover = move_block(&block_shape, &block_angle, &block_x, &block_y, &next_block_shape);
-					}
-					show_cur_block(block_shape, block_angle, block_x, block_y);
+					while (moveBlock(0, 1)) {}   // [수정] 못 내려갈 때까지
+					landed = true;
 				}
 			}
 
 			// 방향키를 누르지 않았을 때, 블록이 밑으로 내려옴
-			if (i % stage_data[level].getSpeed() == 0)
+			if (!landed && i % stage_data[level].getSpeed() == 0)
 			{
-				is_gameover = move_block(&block_shape, &block_angle, &block_x, &block_y, &next_block_shape);
-
-				show_cur_block(block_shape, block_angle, block_x, block_y);
+				if (moveBlock(0, 1)) changed = true;
+				else landed = true;   // [수정] 못 내려가면 착지
 			}
 
-			if (stage_data[level].getClear_line() == lines)	//클리어 스테이지
+			// [수정] 착지했을 때만 줄 검사 / 다음 블록 / 게임오버 판정
+			if (landed)
 			{
-				level++;
-				lines = 0;
+				if (landBlock()) {
+					redraw();
+					show_gameover();
+					SetColor(GRAY);
+					break;
+				}
+				changed = true;
 			}
-			if (is_gameover == 1)
-			{
-				show_gameover();
-				SetColor(GRAY);
-				break;
-			}
+
+			if (changed) redraw();
 
 			gotoxy(77, 23);
 			Sleep(15);
-			gotoxy(77, 23);
 		}
-		init();
 	}
 	return 0;
 }
@@ -183,8 +220,8 @@ int GameManager::gotoxy(int x, int y)
 	// handle은 os의 handle table의 값을 가져옴
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	COORD pos;
-	pos.Y = y;
-	pos.X = x;
+	pos.Y = (SHORT)y;
+	pos.X = (SHORT)x;
 	SetConsoleCursorPosition(hConsole, pos);
 	return 0;
 }
@@ -216,121 +253,53 @@ int GameManager::show_logo()
 	gotoxy(28, 20);
 	printf("Please Press Any Key~!");
 
-	for (i = 0;i >= 0;i++) {
+	for (i = 0; i >= 0; i++) {
 		if (i % 40 == 0)
 		{
-			for (j = 0;j < 5;j++)
+			for (j = 0; j < 5; j++)
 			{
 				gotoxy(18, 14 + j);
 				printf("                                                          ");
 			}
-			show_cur_block(rand() % 7, rand() % 4, 6, 14);
-			show_cur_block(rand() % 7, rand() % 4, 12, 14);
-			show_cur_block(rand() % 7, rand() % 4, 19, 14);
-			show_cur_block(rand() % 7, rand() % 4, 24, 14);
+			CropBlock tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 6, 14);
+			tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 12, 14);
+			tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 19, 14);
+			tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 24, 14);
 		}
 		if (_kbhit())
 			break;
 		Sleep(30);
 	}
 	// 키보드로부터 문자를 즉시 입력받는 함수(아무키나 눌렀던 걸 비우는 거구나)
-	_getche();
+	_getch();
 	system("cls");
 
 	return 0;
 }
 
-int GameManager::show_cur_block(int shape, int angle, int x, int y)
+int GameManager::show_cur_block(Block& b, int x, int y)
 {
 	int i, j;
 
-	switch (shape)
-	{
-	case 0:
-		SetColor(RED);
-		break;
-	case 1:
-		SetColor(BLUE);
-		break;
-	case 2:
-		SetColor(SKY_BLUE);
-		break;
-	case 3:
-		SetColor(WHITE);
-		break;
-	case 4:
-		SetColor(YELLOW);
-		break;
-	case 5:
-		SetColor(VOILET);
-		break;
-	case 6:
-		SetColor(GREEN);
-		break;
-	}
+	// [수정] switch(1) 은 항상 파랑이었음 -> 블록이 자기 색을 알려줌 (다형성)
+	SetColor(b.color());
 
-	for (i = 0;i < 4;i++)
+	for (i = 0; i < 4; i++)
 	{
-		for (j = 0;j < 4;j++)
+		for (j = 0; j < 4; j++)
 		{
 			if ((j + y) < 0)
 				continue;
-			if (block[shape][angle][j][i] == 1)
+			// [수정] isFilled(행, 열) 이라서 (j, i) 순서. i 가 가로, j 가 세로
+			if (b.isFilled(j, i))
 			{
 				gotoxy((i + x) * 2 + ab_x, j + y + ab_y);
-				printf("■");
+				printf("%s", b.symbol());   // [수정] 블록 종류별 문자
 			}
-		}
-	}
-	SetColor(BLACK);
-	gotoxy(77, 23);
-	return 0;
-}
-
-int GameManager::erase_cur_block(int shape, int angle, int x, int y)
-{
-	int i, j;
-	for (i = 0;i < 4;i++)
-	{
-		for (j = 0;j < 4;j++)
-		{
-			if (block[shape][angle][j][i] == 1)
-			{
-				gotoxy((i + x) * 2 + ab_x, j + y + ab_y);
-				printf("  ");
-				//break;
-
-			}
-		}
-	}
-	return 0;
-}
-
-int GameManager::show_total_block()
-{
-	int i, j;
-	SetColor(DARK_GRAY);
-	for (i = 0;i < 21;i++)
-	{
-		for (j = 0;j < 14;j++)
-		{
-			if (j == 0 || j == 13 || i == 20)		//레벨에 따라 외벽 색이 변함
-			{
-				SetColor((level % 6) + 1);
-
-			}
-			else {
-				SetColor(DARK_GRAY);
-			}
-			gotoxy((j * 2) + ab_x, i + ab_y);
-			if (total_block[i][j] == 1)
-			{
-				printf("■");
-			}
-			else {
-				printf("  ");
-			}
-
 		}
 	}
 	SetColor(BLACK);
@@ -339,14 +308,14 @@ int GameManager::show_total_block()
 }
 
 // 오른쪽 위에 다음에 올 블록 표시
-int GameManager::show_next_block(int shape)
+int GameManager::show_next_block(Block& b)
 {
 	int i, j;
 	SetColor((level + 1) % 6 + 1);
-	for (i = 1;i < 7;i++)
+	for (i = 1; i < 7; i++)
 	{
-		gotoxy(33, i);
-		for (j = 0;j < 6;j++)
+		gotoxy(47, i);
+		for (j = 0; j < 6; j++)
 		{
 			if (i == 1 || i == 6 || j == 0 || j == 5)
 			{
@@ -357,97 +326,8 @@ int GameManager::show_next_block(int shape)
 			}
 		}
 	}
-	show_cur_block(shape, 0, 15, 1);
-	return 0;
-}
-
-int GameManager::make_new_block()
-{
-	int shape;
-	int i;
-	i = rand() % 100;
-	if (i <= stage_data[level].getStick_rate())		//막대기 나올확률 계산
-		return 0;							//막대기 모양으로 리턴
-
-	shape = (rand() % 6) + 1;		//shape에는 1~6의 값이 들어감
-	show_next_block(shape);
-	return shape;
-}
-
-int GameManager::strike_check(int shape, int angle, int x, int y)
-{
-	int i, j;
-	int block_dat;
-
-	for (i = 0;i < 4;i++)
-	{
-		for (j = 0;j < 4;j++)
-		{
-			if (((x + j) == 0) || ((x + j) == 13))
-				block_dat = 1;
-			else
-				block_dat = total_block[y + i][x + j];
-
-
-			if ((block_dat == 1) && (block[shape][angle][i][j] == 1))	//좌측벽의 좌표를 빼기위함
-			{
-				return 1;
-			}
-		}
-	}
-	return 0;
-}
-
-int GameManager::merge_block(int shape, int angle, int x, int y)
-{
-	int i, j;
-	for (i = 0;i < 4;i++)
-	{
-		for (j = 0;j < 4;j++)
-		{
-			total_block[y + i][x + j] |= block[shape][angle][i][j];
-		}
-	}
-	check_full_line();
-	show_total_block();
-
-	return 0;
-}
-
-int GameManager::block_start(int shape, int* angle, int* x, int* y)
-{
-	*x = 5;
-	*y = -3;
-	*angle = 0;
-	return 0;
-}
-
-int GameManager::move_block(int* shape, int* angle, int* x, int* y, int* next_shape)
-{
-	erase_cur_block(*shape, *angle, *x, *y);
-
-	(*y)++;	//블럭을 한칸 아래로 내림
-	if (strike_check(*shape, *angle, *x, *y) == 1)
-	{
-		if (*y < 0)	//게임오버
-		{
-
-			return 1;
-		}
-		(*y)--;
-		merge_block(*shape, *angle, *x, *y);
-		*shape = *next_shape;
-		*next_shape = make_new_block();
-
-		block_start(*shape, angle, x, y);	//angle,x,y는 포인터임
-		show_next_block(*next_shape);
-		return 2;
-	}
-	return 0;
-}
-
-int GameManager::rotate_block(int shape, int* angle, int* x, int* y)
-{
+	// 15->20
+	show_cur_block(b, 22, 1);
 	return 0;
 }
 
@@ -464,10 +344,10 @@ int GameManager::show_gameover()
 	printf("┃**************************┃");
 	gotoxy(15, 12);
 	printf("┗━━━━━━━━━━━━━━━━━━━━━━━━━━┛");
-	fflush(stdin);
 	Sleep(1000);
+	while (_kbhit()) _getch();   // [수정] fflush(stdin) 은 정의되지 않은 동작 -> 남은 키 비우기
 
-	_getche();
+	_getch();
 	system("cls");
 
 	return 0;
@@ -475,25 +355,22 @@ int GameManager::show_gameover()
 
 int GameManager::show_gamestat()
 {
-	static int printed_text = 0;
 	SetColor(GRAY);
-	if (printed_text == 0)
-	{
-		gotoxy(35, 7);
-		printf("STAGE");
+	// [수정] static printed_text 는 0 그대로라 의미 없었음 -> 항상 출력 (cls 후에도 다시 보이게)
+	gotoxy(47, 7);
+	printf("STAGE");
 
-		gotoxy(35, 9);
-		printf("SCORE");
+	gotoxy(47, 9);
+	printf("SCORE");
 
-		gotoxy(35, 12);
-		printf("LINES");
+	gotoxy(47, 12);
+	printf("LINES");
 
-	}
-	gotoxy(41, 7);
-	printf("%d", level + 1);
-	gotoxy(35, 10);
+	gotoxy(47, 8);
+	printf("%10d", level + 1);
+	gotoxy(47, 10);
 	printf("%10d", score);
-	gotoxy(35, 13);
+	gotoxy(47, 13);
 	printf("%10d", stage_data[level].getClear_line() - lines);
 	return 0;
 }
@@ -524,11 +401,14 @@ int GameManager::input_data()
 	printf("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛");
 
 
-	while (i < 1 || i>8)
+	while (i < 1 || i > 4)   // [수정] 8 -> 4 (stage_data 가 4개라서)
 	{
 		gotoxy(10, 3);
 		printf("Select Start level[1-4]:       \b\b\b\b\b\b\b");
-		scanf_s("%d", &i);
+		if (scanf_s("%d", &i) != 1) {   // [수정] 숫자 아닌 걸 넣으면 무한루프 방지
+			i = 0;
+			while (getchar() != '\n') {}
+		}
 	}
 
 
@@ -537,50 +417,9 @@ int GameManager::input_data()
 	return 0;
 }
 
-int GameManager::check_full_line()
-{
-	int i, j, k;
-	for (i = 0;i < 20;i++)
-	{
-		for (j = 1;j < 13;j++)
-		{
-			if (total_block[i][j] == 0)
-				break;
-		}
-		if (j == 13)	//한줄이 다 채워졌음
-		{
-			lines++;
-			show_total_block();
-			SetColor(BLUE);
-			gotoxy(1 * 2 + ab_x, i + ab_y);
-			for (j = 1;j < 13;j++)
-			{
-				printf("□");
-				Sleep(10);
-			}
-			gotoxy(1 * 2 + ab_x, i + ab_y);
-			for (j = 1;j < 13;j++)
-			{
-				printf("  ");
-				Sleep(10);
-			}
-
-			for (k = i;k > 0;k--)
-			{
-				for (j = 1;j < 13;j++)
-					total_block[k][j] = total_block[k - 1][j];
-			}
-			for (j = 1;j < 13;j++)
-				total_block[0][j] = 0;
-			score += 100 + (level * 10) + (rand() % 10);
-			show_gamestat();
-		}
-	}
-	return 0;
-}
 
 void GameManager::SetColor(int color)
 {
 	static HANDLE std_output_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleTextAttribute(std_output_handle, color);
+	SetConsoleTextAttribute(std_output_handle, (WORD)color);
 }

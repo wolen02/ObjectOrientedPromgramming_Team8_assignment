@@ -10,7 +10,8 @@ private:
     char total_block[height][width];   // 0 빈칸, 1 벽, 2 해충(P), 3 돌(R), 'c' 작물
   
     unique_ptr<Block> stuck[height][width];//돌의 내구도를 기억하기 위함
-    void shiftDown(int row); //돌이 있는 줄 제외하고 한칸씩 내림
+    void shiftColumnDown(int row, int x);   // [수정] x 열만 row 위 칸들을 한 칸 내린다 (돌 위는 안 내려감)
+    void shiftDownFrom(int row);
 public:
     Board();
     void initBoard();  // 보드를 처음 상태로 만들어

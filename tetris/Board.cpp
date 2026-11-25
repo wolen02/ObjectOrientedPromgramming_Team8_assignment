@@ -53,11 +53,13 @@ int Board::checkFullLine() {
         }
 
         if (stoneSurvived) {
+            // [수정] 작물을 수확한 칸에는 위 블록들이 내려온다. 돌이 있는 열만 그대로
             for (int x = 1; x < width - 1; x++)
-                if (!stuck[y][x]) total_block[y][x] = 0;   // 작물만 수확
+                if (!stuck[y][x]) shiftColumnDown(y, x);
+            y++;   // [수정] 내려온 줄을 다시 검사
         }
         else {
-            shiftDown(y);
+            shiftDownFrom(y);
             y++;
         }
     }
@@ -153,17 +155,19 @@ int Board::removeBlock(const Block& b) {
     return 0;
 }
 
-//[돌 추가]
-void Board::shiftDown(int row) {
-    for (int x = 1; x < width - 1; x++) {
-        int stoneRow = -1;
-        for (int r = row - 1; r >= 0; r--) {
-            if (stuck[r][x]) { stoneRow = r; break; }
-        }
-        for (int r = row; r > stoneRow + 1; r--)
-            total_block[r][x] = total_block[r - 1][x];
-        total_block[stoneRow + 1][x] = 0;
-    }
+void Board::shiftColumnDown(int row, int x) {   // [수정] 한 열만 내리는 부분을 따로 뺐다
+    int stoneRow = -1;                         // 이 열에서 row 위쪽의 가장 가까운 돌 (없으면 -1)
+    for (int r = row - 1; r >= 0; r--)
+        if (stuck[r][x]) { stoneRow = r; break; }
+
+    for (int r = row; r > stoneRow + 1; r--)   // 돌 아래 칸들만 한 칸씩 내린다
+        total_block[r][x] = total_block[r - 1][x];
+    total_block[stoneRow + 1][x] = 0;          // 돌 바로 아래(돌이 없으면 맨 윗줄)는 빈칸
+}
+
+void Board::shiftDownFrom(int row) {
+    for (int x = 1; x < width - 1; x++)
+        shiftColumnDown(row, x);
 }
 
 int Board::spawnStones(int count) {//보드 절반 아래에 count개수만큼 랜덤으로 돌 생성 나중에 스테이지에서 count값 설정해서 조절
