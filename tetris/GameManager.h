@@ -2,6 +2,7 @@
 #include"Board.h"
 #include"Stage.h"
 #include"CropBlock.h"
+#include<memory>
 
 class GameManager
 {
@@ -16,8 +17,8 @@ private:
 	int ab_y;
 	// 보드는 불러오면 알아서 초기화 되게 보드에서 만들기. 나는 그냥 사용만.
 	Board board;
-	unique_ptr< CropBlock> curBlock;
-	unique_ptr< CropBlock> nextBlock;
+	std::unique_ptr<CropBlock> curBlock;
+	std::unique_ptr<CropBlock> nextBlock;
 
 	enum {
 		BLACK,      /*  0 : 까망 */
@@ -47,12 +48,13 @@ public:
 	int show_logo();
 	void SetColor(int color);
 
-	int show_next_block(int shape);
+	int show_next_block(Block& b);
 	int merge_block(int shape, int angle, int x, int y);	//블럭이 바닥에 닿았을때 진행중인 블럭과 쌓아진 블럭을 합침
 	int block_start(int shape, int* angle, int* x, int* y);	//블럭이 처음 나올때 위치와 모양을 알려줌
 	int show_gameover();
 	int show_gamestat();
 	int input_data();
 	int check_full_line();
+	int show_cur_block(Block& b, int x, int y);
 };
 

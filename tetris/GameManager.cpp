@@ -43,8 +43,8 @@ int GameManager::init()
 	// 무한 반복 실행
 	while (1)
 	{
-		
 		// 비어있는 보드 보여주기
+		system("cls");
 		board.showBoard();
 
 		// 현재 블록과 다음에 올 블록 미리 생성하기
@@ -52,7 +52,7 @@ int GameManager::init()
 		nextBlock = make_unique<CropBlock>(rand()%7);
 
 		// 오른쪽 위에 다음에 올 블록 표시
-		//show_next_block(next_block_shape);
+		show_next_block(*nextBlock);
 		
 		
 		// 현재 스테이지 정보, 점수, 클리어까지 남은 라인의 수를 콘솔화면에 줄력
@@ -87,6 +87,7 @@ int GameManager::init()
 							board.removeBlock(*curBlock);
 							curBlock->rotateCW();
 							board.place(*curBlock);
+							system("cls");
 							board.showBoard();
 
 						}
@@ -100,6 +101,7 @@ int GameManager::init()
 							board.removeBlock(*curBlock);
 							curBlock->moveLeft();
 							board.place(*curBlock);
+							system("cls");
 							board.showBoard();
 
 						}
@@ -113,6 +115,7 @@ int GameManager::init()
 							board.removeBlock(*curBlock);
 							curBlock->moveRight();
 							board.place(*curBlock);
+							system("cls");
 							board.showBoard();
 
 						}
@@ -126,6 +129,7 @@ int GameManager::init()
 							board.removeBlock(*curBlock);
 							curBlock->moveDown();
 							board.place(*curBlock);
+							system("cls");
 							board.showBoard();
 
 						}
@@ -136,42 +140,78 @@ int GameManager::init()
 				// 입력 키가 스페이스 바면
 				if (keytemp == 32)
 				{
-					while (is_gameover == 0)
+					while (board.canPlace(*curBlock))
 					{
-						// move_block은 충돌이 일어났을 때 game over면 return 1
-						// 충돌이 일어났지만 문제없다면 return 2
-						// 충돌이 일어나지 않았다면 return 0
-						is_gameover = move_block(&block_shape, &block_angle, &block_x, &block_y, &next_block_shape);
+						curBlock->moveDown();
+						if (board.canPlace(*curBlock))
+						{
+							// 이전 상태 지우고 다시 아래로 이동
+							curBlock->moveUp();
+							board.removeBlock(*curBlock);
+							curBlock->moveDown();
+							board.place(*curBlock);
+						}
+						else {
+							curBlock->moveUp();
+							break;
+						}
 					}
-					show_cur_block(block_shape, block_angle, block_x, block_y);
+
+					system("cls");
+					board.showBoard();
 				}
 			}
 
 			// 방향키를 누르지 않았을 때, 블록이 밑으로 내려옴
 			if (i % stage_data[level].getSpeed() == 0)
 			{
-				is_gameover = move_block(&block_shape, &block_angle, &block_x, &block_y, &next_block_shape);
+				curBlock->moveDown();
+				if (board.canPlace(*curBlock))
+				{
+					// 이전 상태 지우고 다시 아래로 이동
+					curBlock->moveUp();
+					board.removeBlock(*curBlock);
+					curBlock->moveDown();
+					board.place(*curBlock);
+					system("cls");
+					board.showBoard();
+				}
 
-				show_cur_block(block_shape, block_angle, block_x, block_y);
 			}
+
+			// 클리어한 line 확인
+			lines += board.checkFullLine();
 
 			if (stage_data[level].getClear_line() == lines)	//클리어 스테이지
 			{
 				level++;
 				lines = 0;
 			}
-			if (is_gameover == 1)
-			{
-				show_gameover();
-				SetColor(GRAY);
-				break;
-			}
 
+			// 블록이 맞닿았음을 확인하고 닿았으면 블록이 윗칸을 넘는지 확인하여 게임 종료여부 확인
+			curBlock->moveDown();
+			if (board.canPlace(*curBlock)) {
+				curBlock->moveUp();
+			}
+			else {
+				curBlock->moveUp();
+
+				if (curBlock->isAboveTop()) {
+					// 게임오버
+					show_gameover();
+					SetColor(GRAY);
+					break;
+				}
+				else {
+					curBlock = move(nextBlock);
+					nextBlock = make_unique<CropBlock>(rand()%7);
+				}
+			}
+			
 			gotoxy(77, 23);
 			Sleep(15);
 			gotoxy(77, 23);
 		}
-		init();
 	}
 	return 0;
 }
@@ -224,10 +264,14 @@ int GameManager::show_logo()
 				gotoxy(18, 14 + j);
 				printf("                                                          ");
 			}
-			show_cur_block(rand() % 7, rand() % 4, 6, 14);
-			show_cur_block(rand() % 7, rand() % 4, 12, 14);
-			show_cur_block(rand() % 7, rand() % 4, 19, 14);
-			show_cur_block(rand() % 7, rand() % 4, 24, 14);
+			CropBlock tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 6, 14);
+			tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 12, 14);
+			tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 19, 14);
+			tempBlock = CropBlock(rand() % 7);
+			show_cur_block(tempBlock, 24, 14);
 		}
 		if (_kbhit())
 			break;
@@ -240,11 +284,11 @@ int GameManager::show_logo()
 	return 0;
 }
 
-int GameManager::show_cur_block(int shape, int angle, int x, int y)
+int GameManager::show_cur_block(Block& b, int x, int y)
 {
 	int i, j;
 
-	switch (shape)
+	switch (1)
 	{
 	case 0:
 		SetColor(RED);
@@ -275,62 +319,11 @@ int GameManager::show_cur_block(int shape, int angle, int x, int y)
 		{
 			if ((j + y) < 0)
 				continue;
-			if (block[shape][angle][j][i] == 1)
+			if (b.isFilled(i,j))
 			{
 				gotoxy((i + x) * 2 + ab_x, j + y + ab_y);
 				printf("■");
 			}
-		}
-	}
-	SetColor(BLACK);
-	gotoxy(77, 23);
-	return 0;
-}
-
-int GameManager::erase_cur_block(int shape, int angle, int x, int y)
-{
-	int i, j;
-	for (i = 0;i < 4;i++)
-	{
-		for (j = 0;j < 4;j++)
-		{
-			if (block[shape][angle][j][i] == 1)
-			{
-				gotoxy((i + x) * 2 + ab_x, j + y + ab_y);
-				printf("  ");
-				//break;
-
-			}
-		}
-	}
-	return 0;
-}
-
-int GameManager::show_total_block()
-{
-	int i, j;
-	SetColor(DARK_GRAY);
-	for (i = 0;i < 21;i++)
-	{
-		for (j = 0;j < 14;j++)
-		{
-			if (j == 0 || j == 13 || i == 20)		//레벨에 따라 외벽 색이 변함
-			{
-				SetColor((level % 6) + 1);
-
-			}
-			else {
-				SetColor(DARK_GRAY);
-			}
-			gotoxy((j * 2) + ab_x, i + ab_y);
-			if (total_block[i][j] == 1)
-			{
-				printf("■");
-			}
-			else {
-				printf("  ");
-			}
-
 		}
 	}
 	SetColor(BLACK);
@@ -339,13 +332,13 @@ int GameManager::show_total_block()
 }
 
 // 오른쪽 위에 다음에 올 블록 표시
-int GameManager::show_next_block(int shape)
+int GameManager::show_next_block(Block& b)
 {
 	int i, j;
 	SetColor((level + 1) % 6 + 1);
 	for (i = 1;i < 7;i++)
 	{
-		gotoxy(33, i);
+		gotoxy(47, i);
 		for (j = 0;j < 6;j++)
 		{
 			if (i == 1 || i == 6 || j == 0 || j == 5)
@@ -357,97 +350,17 @@ int GameManager::show_next_block(int shape)
 			}
 		}
 	}
-	show_cur_block(shape, 0, 15, 1);
+	// 15->20
+	show_cur_block(b, 22, 1);
 	return 0;
 }
 
-int GameManager::make_new_block()
-{
-	int shape;
-	int i;
-	i = rand() % 100;
-	if (i <= stage_data[level].getStick_rate())		//막대기 나올확률 계산
-		return 0;							//막대기 모양으로 리턴
-
-	shape = (rand() % 6) + 1;		//shape에는 1~6의 값이 들어감
-	show_next_block(shape);
-	return shape;
-}
-
-int GameManager::strike_check(int shape, int angle, int x, int y)
-{
-	int i, j;
-	int block_dat;
-
-	for (i = 0;i < 4;i++)
-	{
-		for (j = 0;j < 4;j++)
-		{
-			if (((x + j) == 0) || ((x + j) == 13))
-				block_dat = 1;
-			else
-				block_dat = total_block[y + i][x + j];
-
-
-			if ((block_dat == 1) && (block[shape][angle][i][j] == 1))	//좌측벽의 좌표를 빼기위함
-			{
-				return 1;
-			}
-		}
-	}
-	return 0;
-}
-
-int GameManager::merge_block(int shape, int angle, int x, int y)
-{
-	int i, j;
-	for (i = 0;i < 4;i++)
-	{
-		for (j = 0;j < 4;j++)
-		{
-			total_block[y + i][x + j] |= block[shape][angle][i][j];
-		}
-	}
-	check_full_line();
-	show_total_block();
-
-	return 0;
-}
 
 int GameManager::block_start(int shape, int* angle, int* x, int* y)
 {
 	*x = 5;
 	*y = -3;
 	*angle = 0;
-	return 0;
-}
-
-int GameManager::move_block(int* shape, int* angle, int* x, int* y, int* next_shape)
-{
-	erase_cur_block(*shape, *angle, *x, *y);
-
-	(*y)++;	//블럭을 한칸 아래로 내림
-	if (strike_check(*shape, *angle, *x, *y) == 1)
-	{
-		if (*y < 0)	//게임오버
-		{
-
-			return 1;
-		}
-		(*y)--;
-		merge_block(*shape, *angle, *x, *y);
-		*shape = *next_shape;
-		*next_shape = make_new_block();
-
-		block_start(*shape, angle, x, y);	//angle,x,y는 포인터임
-		show_next_block(*next_shape);
-		return 2;
-	}
-	return 0;
-}
-
-int GameManager::rotate_block(int shape, int* angle, int* x, int* y)
-{
 	return 0;
 }
 
@@ -479,21 +392,21 @@ int GameManager::show_gamestat()
 	SetColor(GRAY);
 	if (printed_text == 0)
 	{
-		gotoxy(35, 7);
+		gotoxy(47, 7);
 		printf("STAGE");
 
-		gotoxy(35, 9);
+		gotoxy(47, 9);
 		printf("SCORE");
 
-		gotoxy(35, 12);
+		gotoxy(47, 12);
 		printf("LINES");
 
 	}
-	gotoxy(41, 7);
-	printf("%d", level + 1);
-	gotoxy(35, 10);
+	gotoxy(47, 8);
+	printf("%10d", level + 1);
+	gotoxy(47, 10);
 	printf("%10d", score);
-	gotoxy(35, 13);
+	gotoxy(47, 13);
 	printf("%10d", stage_data[level].getClear_line() - lines);
 	return 0;
 }
@@ -537,47 +450,6 @@ int GameManager::input_data()
 	return 0;
 }
 
-int GameManager::check_full_line()
-{
-	int i, j, k;
-	for (i = 0;i < 20;i++)
-	{
-		for (j = 1;j < 13;j++)
-		{
-			if (total_block[i][j] == 0)
-				break;
-		}
-		if (j == 13)	//한줄이 다 채워졌음
-		{
-			lines++;
-			show_total_block();
-			SetColor(BLUE);
-			gotoxy(1 * 2 + ab_x, i + ab_y);
-			for (j = 1;j < 13;j++)
-			{
-				printf("□");
-				Sleep(10);
-			}
-			gotoxy(1 * 2 + ab_x, i + ab_y);
-			for (j = 1;j < 13;j++)
-			{
-				printf("  ");
-				Sleep(10);
-			}
-
-			for (k = i;k > 0;k--)
-			{
-				for (j = 1;j < 13;j++)
-					total_block[k][j] = total_block[k - 1][j];
-			}
-			for (j = 1;j < 13;j++)
-				total_block[0][j] = 0;
-			score += 100 + (level * 10) + (rand() % 10);
-			show_gamestat();
-		}
-	}
-	return 0;
-}
 
 void GameManager::SetColor(int color)
 {
